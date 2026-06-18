@@ -438,7 +438,7 @@
     datosFormulario.append("archivo", inputArchivo.files[0]);
 
     try {
-      const resp = await fetch(`${API_BASE}/documentos`, {
+      const resp = await fetch(`${API_BASE}/rag/documentos`, {
         method: "POST",
         body: datosFormulario,
       });

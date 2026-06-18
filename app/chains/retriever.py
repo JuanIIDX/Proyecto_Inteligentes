@@ -25,9 +25,11 @@ from functools import lru_cache
 from langchain_core.documents import Document
 from langchain_core.runnables import Runnable, RunnableLambda
 from langchain_postgres import PGVector
+from sqlalchemy import text
 
 from app.chains.embeddings import get_embeddings
 from app.core.config import settings
+from app.db.session import get_engine
 
 logger = logging.getLogger(__name__)
 
@@ -89,3 +91,57 @@ def construir_consulta(asunto: str, descripcion: str) -> str:
     mejoran la recuperación semántica frente a usar solo uno.
     """
     return f"{asunto}\n{descripcion}"
+
+
+def buscar_con_score(consulta: str, k: int | None = None) -> list[dict[str, object]]:
+    """
+    Recupera los fragmentos más parecidos a la consulta CON su puntuación.
+
+    A diferencia del retriever (que solo devuelve documentos), aquí se expone
+    también la distancia/score de cada fragmento. Sirve para inspeccionar y
+    demostrar el retrieval: ver QUÉ se recuperó y CUÁN parecido era, sin que el
+    LLM intervenga.
+
+    pgvector devuelve una "distancia" (menor = más parecido). Se reporta tal
+    cual en 'score' junto con el contenido y la fuente.
+    """
+    top_k = k or settings.rag_top_k
+    resultados = get_vector_store().similarity_search_with_score(consulta, k=top_k)
+    return [
+        {
+            "contenido": doc.page_content,
+            "fuente": doc.metadata.get("fuente", "desconocida"),
+            "score": float(score),
+        }
+        for doc, score in resultados
+    ]
+
+
+def listar_documentos() -> list[dict[str, object]]:
+    """
+    Devuelve los documentos indexados, agrupados por su nombre de archivo.
+
+    Consulta la tabla `langchain_pg_embedding` (la que crea PGVector) y agrupa
+    por la 'fuente' guardada en los metadatos JSONB, contando cuántos fragmentos
+    tiene cada documento. Sirve para ver qué hay cargado en el vector store.
+
+    Si la tabla aún no existe (no se ha indexado nada todavía), devuelve [].
+    """
+    sql = text(
+        """
+        select cmetadata->>'fuente' as fuente, count(*) as fragmentos
+        from langchain_pg_embedding
+        group by cmetadata->>'fuente'
+        order by fuente
+        """
+    )
+    try:
+        with get_engine().connect() as conn:
+            filas = conn.execute(sql).mappings().all()
+    except Exception:
+        # La tabla no existe todavía: nada indexado aún.
+        logger.info("Aún no hay documentos indexados (tabla de vectores vacía).")
+        return []
+    return [
+        {"fuente": fila["fuente"], "fragmentos": fila["fragmentos"]} for fila in filas
+    ]

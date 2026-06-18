@@ -18,7 +18,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes_documentos import router as documentos_router
+from app.api.routes_rag import router as rag_router
 from app.api.routes_solicitudes import router as solicitudes_router
 from app.core.config import settings
 from app.core.logging_config import setup_logging
@@ -66,7 +66,7 @@ app.add_middleware(
 )
 
 app.include_router(solicitudes_router)
-app.include_router(documentos_router)
+app.include_router(rag_router)
 
 
 @app.get("/health", tags=["Sistema"], summary="Estado del servicio")
