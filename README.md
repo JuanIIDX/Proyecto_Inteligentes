@@ -134,7 +134,7 @@ Cliente  ◄── 201 Created { id, categoria, prioridad, responsable, ... }
 - Un recurso de **Azure OpenAI** con un modelo desplegado (Azure AI Foundry)
 
 Crea las tablas en Supabase (una sola vez): abre **SQL Editor → New query**,
-pega el contenido de [app/db/schema.sql](app/db/schema.sql) y ejecútalo. Esto
+pega el contenido de `_private/db/schema.sql` y ejecútalo. Esto
 crea las tablas `solicitudes`, `funcionarios` y `asignaciones` y carga el
 catálogo inicial de funcionarios.
 
@@ -165,7 +165,7 @@ pip install -r requirements.txt
 copy .env.example .env
 #   Edita .env y coloca tus credenciales de Azure OpenAI y Supabase
 
-# 4) Crear las tablas en Supabase (SQL Editor) con app/db/schema.sql
+# 4) Crear las tablas en Supabase (SQL Editor) con _private/db/schema.sql
 
 # 5) Levantar la API
 uvicorn app.main:app --reload

@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Se ejecuta al arrancar y al apagar la aplicación."""
     logger.info("Iniciando %s ...", settings.app_name)
-    # Las tablas de Supabase se crean ejecutando app/db/schema.sql en el
+    # Las tablas de Supabase se crean ejecutando _private/db/schema.sql en el
     # SQL Editor del proyecto (una sola vez), no desde la aplicación.
     logger.info("Aplicación lista.")
     yield

@@ -3,7 +3,7 @@ Script de prueba manual de la cadena de clasificación SIN levantar la API.
 
 Útil para verificar rápidamente que Gemini, la cadena LCEL y la Tool funcionan.
 Requiere GOOGLE_API_KEY, SUPABASE_URL y SUPABASE_KEY configurados, y las tablas
-ya creadas en Supabase (app/db/schema.sql).
+ya creadas en Supabase (_private/db/schema.sql).
 
 Ejecutar:  python -m scripts.probar_clasificacion
 """
