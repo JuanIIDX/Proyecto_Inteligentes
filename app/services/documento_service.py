@@ -14,6 +14,7 @@ contenido se decodifica como UTF-8 (con respaldo latin-1 por si el archivo
 viniera en otra codificación).
 """
 
+import io
 import logging
 from pathlib import Path
 
@@ -24,8 +25,9 @@ from app.chains.retriever import get_vector_store
 
 logger = logging.getLogger(__name__)
 
-# Extensiones de texto plano que sabemos leer directamente.
-EXTENSIONES_SOPORTADAS = {".txt", ".md"}
+# Extensiones soportadas: texto plano (se leen directo) y PDF (se extrae texto).
+EXTENSIONES_TEXTO = {".txt", ".md"}
+EXTENSIONES_SOPORTADAS = EXTENSIONES_TEXTO | {".pdf"}
 
 
 class DocumentoService:
@@ -39,11 +41,30 @@ class DocumentoService:
         )
 
     def _decodificar(self, contenido: bytes) -> str:
-        """Convierte los bytes del archivo a texto, tolerando codificaciones."""
+        """Convierte los bytes de un archivo de texto, tolerando codificaciones."""
         try:
             return contenido.decode("utf-8")
         except UnicodeDecodeError:
             return contenido.decode("latin-1")
+
+    def _extraer_pdf(self, contenido: bytes) -> str:
+        """
+        Extrae el texto de un PDF a partir de sus bytes (sin escribir a disco).
+
+        Concatena el texto de todas las páginas. Importa pypdf de forma perezosa
+        para no cargarlo cuando solo se suben archivos de texto.
+        """
+        from pypdf import PdfReader
+
+        lector = PdfReader(io.BytesIO(contenido))
+        paginas = [pagina.extract_text() or "" for pagina in lector.pages]
+        return "\n".join(paginas)
+
+    def _leer_texto(self, extension: str, contenido: bytes) -> str:
+        """Obtiene el texto del documento según su extensión."""
+        if extension == ".pdf":
+            return self._extraer_pdf(contenido)
+        return self._decodificar(contenido)
 
     def indexar(self, nombre_archivo: str, contenido: bytes) -> dict[str, int | str]:
         """
@@ -60,9 +81,12 @@ class DocumentoService:
                 f"Usa uno de: {sorted(EXTENSIONES_SOPORTADAS)}."
             )
 
-        texto = self._decodificar(contenido).strip()
+        texto = self._leer_texto(extension, contenido).strip()
         if not texto:
-            raise ValueError("El documento está vacío.")
+            raise ValueError(
+                "No se pudo extraer texto del documento. Si es un PDF, puede ser "
+                "una imagen escaneada (sin texto seleccionable)."
+            )
 
         # Guardamos el nombre del archivo como metadato 'fuente' para poder
         # rastrear de qué documento salió cada fragmento.

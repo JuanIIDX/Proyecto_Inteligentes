@@ -188,12 +188,12 @@
   <section class="tarjeta">
     <h2>Base de conocimiento (RAG)</h2>
     <p style="margin:0 0 1rem; color:var(--gris); font-size:0.85rem;">
-      Sube documentos (.txt o .md) con normativa, reglamentos o casos históricos.
-      La IA los usará como contexto al clasificar nuevas solicitudes.
+      Sube documentos (.txt, .md o .pdf) con normativa, reglamentos o casos
+      históricos. La IA los usará como contexto al clasificar nuevas solicitudes.
     </p>
     <form id="form-documento">
       <label for="archivo">Documento</label>
-      <input type="file" id="archivo" name="archivo" accept=".txt,.md" required>
+      <input type="file" id="archivo" name="archivo" accept=".txt,.md,.pdf" required>
       <button type="submit" id="btn-subir">Subir e indexar</button>
     </form>
     <div id="resultado-documento"></div>
