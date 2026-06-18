@@ -6,7 +6,11 @@ está diseñado con:
   - Un mensaje de sistema que define el rol y las reglas del clasificador.
   - Definiciones explícitas de cada categoría y de cada nivel de prioridad,
     para reducir ambigüedad y mejorar la consistencia del LLM.
-  - Un mensaje humano con las variables {asunto} y {descripcion}.
+  - Un mensaje humano con las variables {asunto}, {descripcion} y {contexto}.
+
+La variable {contexto} contiene la normativa o el histórico recuperado por el
+retriever (RAG). Cuando RAG está desactivado, la cadena la rellena con un texto
+neutro, de modo que el mismo prompt sirve con y sin recuperación.
 """
 
 from langchain_core.prompts import ChatPromptTemplate
@@ -29,15 +33,21 @@ Debes asignar EXACTAMENTE una PRIORIDAD entre estas:
 - Baja: consulta general, información o solicitud sin impacto inmediato.
 
 Reglas:
-1. Basa tu decisión únicamente en el contenido del asunto y la descripción.
-2. Sé consistente: ante el mismo tipo de solicitud, clasifica siempre igual.
-3. En 'razonamiento' explica de forma breve (1-2 frases) por qué elegiste esa
+1. Basa tu decisión en el contenido del asunto y la descripción.
+2. Si el CONTEXTO incluye normativa o casos históricos relevantes, úsalo como
+   apoyo para decidir la categoría y la prioridad. Si el contexto no es
+   pertinente o está vacío, ignóralo y clasifica solo con la solicitud.
+3. Sé consistente: ante el mismo tipo de solicitud, clasifica siempre igual.
+4. En 'razonamiento' explica de forma breve (1-2 frases) por qué elegiste esa
    categoría y prioridad.
-4. Responde siempre en español.
+5. Responde siempre en español.
 """
 
 HUMANO_CLASIFICADOR = """\
 Clasifica la siguiente solicitud universitaria.
+
+CONTEXTO (normativa o histórico relevante recuperado):
+{contexto}
 
 ASUNTO: {asunto}
 DESCRIPCIÓN: {descripcion}

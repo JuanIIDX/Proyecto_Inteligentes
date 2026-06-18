@@ -1,0 +1,95 @@
+{
+  "name": "SolicitudesUniversitariasOutput",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "aeeecd50-fef0-43ef-8b50-a18e8571e7a7",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -96,
+        -144
+      ],
+      "id": "110d847a-e0ce-45f4-8e75-1c58f27f156d",
+      "name": "Webhook",
+      "webhookId": "aeeecd50-fef0-43ef-8b50-a18e8571e7a7"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "solicitudes"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        112,
+        -144
+      ],
+      "id": "5aec67de-1336-47da-acee-38e38564b7b6",
+      "name": "Get many rows",
+      "credentials": {
+        "supabaseApi": {
+          "id": "VFKMV4P98Ob1OsI8",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $input.all().map(item => item.json) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        480,
+        -160
+      ],
+      "id": "2b9de007-884b-44d7-b5a5-c7c4edd7d5d2",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get many rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many rows": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "5500b167-8671-4a5a-8800-6d546a3d67f6",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "befb8bd9788c36047856f8e7a220997faf52437d911cc10d5dffa2dec0c55c54"
+  },
+  "nodeGroups": [],
+  "id": "62Xa8nhPIuscduni",
+  "tags": []
+}

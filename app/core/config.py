@@ -25,6 +25,17 @@ class Settings(BaseSettings):
     azure_openai_api_version: str = "2024-10-21"
     llm_temperature: float = 0.1
 
+    # ---- RAG (Retrieval-Augmented Generation) ----
+    # Activa/desactiva el paso de recuperación de contexto en la cadena. Si está
+    # en False (por defecto), el sistema clasifica como hasta ahora, sin RAG.
+    rag_enabled: bool = False
+    # Deployment del modelo de embeddings en Azure (p. ej. text-embedding-3-small).
+    azure_openai_embeddings_deployment: str = "text-embedding-3-small"
+    # Nombre de la colección de pgvector donde se guardan los documentos indexados.
+    rag_collection_name: str = "documentos_universitarios"
+    # Número de fragmentos que el retriever inyecta como contexto en el prompt.
+    rag_top_k: int = 3
+
     # ---- Base de datos (Azure Database for PostgreSQL) ----
     database_url: str
 

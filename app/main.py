@@ -18,6 +18,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.routes_documentos import router as documentos_router
 from app.api.routes_solicitudes import router as solicitudes_router
 from app.core.config import settings
 from app.core.logging_config import setup_logging
@@ -32,6 +33,12 @@ async def lifespan(app: FastAPI):
     logger.info("Iniciando %s ...", settings.app_name)
     # Las tablas de Supabase se crean ejecutando _private/db/schema.sql en el
     # SQL Editor del proyecto (una sola vez), no desde la aplicación.
+    # Si RAG está activado, nos aseguramos de que la extensión pgvector exista
+    # para no depender de un cliente SQL externo.
+    if settings.rag_enabled:
+        from app.db.session import asegurar_extension_vector
+
+        asegurar_extension_vector()
     logger.info("Aplicación lista.")
     yield
     logger.info("Apagando la aplicación.")
@@ -59,6 +66,7 @@ app.add_middleware(
 )
 
 app.include_router(solicitudes_router)
+app.include_router(documentos_router)
 
 
 @app.get("/health", tags=["Sistema"], summary="Estado del servicio")

@@ -5,12 +5,17 @@ gunicorn==23.0.0
 pydantic==2.13.4
 pydantic-settings==2.7.1
 python-dotenv==1.0.1
+python-multipart==0.0.20
 
 # ===== LangChain + Azure OpenAI =====
 langchain==0.3.14
 langchain-core==0.3.29
 langchain-openai==0.3.0
 langchain-community==0.3.14
+
+# ===== RAG: vector store sobre PostgreSQL (pgvector) =====
+langchain-postgres==0.0.12
+pgvector==0.2.5
 
 # ===== Base de datos (Azure Database for PostgreSQL) =====
 sqlalchemy==2.0.36

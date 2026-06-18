@@ -83,7 +83,7 @@
   .punto.ok { background: #2e7d32; }
   .punto.error { background: var(--alta); }
 
-  #resultado, #resultado-documento {
+  #resultado {
     margin-top: 1.2rem;
     padding: 1rem;
     border-radius: 8px;
@@ -92,7 +92,7 @@
     font-size: 0.88rem;
     display: none;
   }
-  #resultado.error, #resultado-documento.error { background: #fdecea; border-color: #f1b0a8; color: var(--alta); }
+  #resultado.error { background: #fdecea; border-color: #f1b0a8; color: var(--alta); }
   #resultado dl { margin: 0; display: grid; grid-template-columns: 130px 1fr; gap: 0.35rem 0.6rem; }
   #resultado dt { font-weight: 600; color: var(--gris); }
   #resultado dd { margin: 0; }
@@ -158,7 +158,7 @@
 
 <header>
   <h1>Sistema Inteligente de Solicitudes Universitarias</h1>
-  <p>Cliente de prueba — FastAPI + LangChain + Azure OpenAI + Supabase</p>
+  <p>Cliente de prueba — backend desplegado en Azure App Service</p>
   <div id="estado-conexion"><span class="punto" id="punto-conexion"></span><span id="texto-conexion">Verificando conexión...</span></div>
 </header>
 
@@ -186,20 +186,6 @@
   </section>
 
   <section class="tarjeta">
-    <h2>Base de conocimiento (RAG)</h2>
-    <p style="margin:0 0 1rem; color:var(--gris); font-size:0.85rem;">
-      Sube documentos (.txt o .md) con normativa, reglamentos o casos históricos.
-      La IA los usará como contexto al clasificar nuevas solicitudes.
-    </p>
-    <form id="form-documento">
-      <label for="archivo">Documento</label>
-      <input type="file" id="archivo" name="archivo" accept=".txt,.md" required>
-      <button type="submit" id="btn-subir">Subir e indexar</button>
-    </form>
-    <div id="resultado-documento"></div>
-  </section>
-
-  <section class="tarjeta">
     <div class="toolbar">
       <h2 style="margin:0;">Historial de solicitudes</h2>
       <button id="btn-refrescar" type="button">Refrescar</button>
@@ -224,10 +210,21 @@
     </div>
   </section>
 
+  <section class="tarjeta">
+    <h2 style="margin:0 0 0.6rem;">Documentación interactiva (Swagger)</h2>
+    <p style="margin:0; color:var(--gris); font-size:0.85rem;">
+      También puedes explorar y probar todos los endpoints directamente desde
+      la documentación autogenerada de FastAPI:
+      <a href="https://solicitudes-ia-ucaldas-etbahkapc6ehgpfm.centralus-01.azurewebsites.net/docs" target="_blank" rel="noopener">
+        abrir /docs en Azure
+      </a>
+    </p>
+  </section>
+
 </div>
 
 <script>
-  const API_BASE = "http://127.0.0.1:8000";
+  const API_BASE = "https://solicitudes-ia-ucaldas-etbahkapc6ehgpfm.centralus-01.azurewebsites.net";
 
   const form = document.getElementById("form-solicitud");
   const btnEnviar = document.getElementById("btn-enviar");
@@ -253,7 +250,7 @@
       textoConexion.textContent = "Conectado a la API (" + API_BASE + ")";
     } catch {
       puntoConexion.classList.add("error");
-      textoConexion.textContent = "No se pudo conectar a " + API_BASE + " — ¿está el servidor corriendo?";
+      textoConexion.textContent = "No se pudo conectar a " + API_BASE + " — ¿está el servicio activo?";
     }
   }
 
@@ -411,52 +408,6 @@
   });
 
   btnRefrescar.addEventListener("click", cargarSolicitudes);
-
-  // ---- Subida de documentos (RAG) ----
-  const formDocumento = document.getElementById("form-documento");
-  const inputArchivo = document.getElementById("archivo");
-  const btnSubir = document.getElementById("btn-subir");
-  const divResultadoDoc = document.getElementById("resultado-documento");
-
-  function mostrarResultadoDoc(mensaje, esError) {
-    divResultadoDoc.style.display = "block";
-    divResultadoDoc.classList.toggle("error", esError);
-    divResultadoDoc.innerHTML = esError
-      ? `<strong>Error:</strong> ${escapeHtml(mensaje)}`
-      : mensaje;
-  }
-
-  formDocumento.addEventListener("submit", async (evento) => {
-    evento.preventDefault();
-    if (!inputArchivo.files.length) return;
-
-    btnSubir.disabled = true;
-    btnSubir.textContent = "Indexando...";
-    divResultadoDoc.style.display = "none";
-
-    const datosFormulario = new FormData();
-    datosFormulario.append("archivo", inputArchivo.files[0]);
-
-    try {
-      const resp = await fetch(`${API_BASE}/documentos`, {
-        method: "POST",
-        body: datosFormulario,
-      });
-      const datos = await resp.json();
-      if (!resp.ok) throw new Error(datos.detail || `HTTP ${resp.status}`);
-      mostrarResultadoDoc(
-        `Documento <strong>${escapeHtml(datos.fuente)}</strong> indexado ` +
-        `(${datos.fragmentos} fragmento(s)). La IA ya puede usarlo como contexto.`,
-        false
-      );
-      formDocumento.reset();
-    } catch (err) {
-      mostrarResultadoDoc(err.message, true);
-    } finally {
-      btnSubir.disabled = false;
-      btnSubir.textContent = "Subir e indexar";
-    }
-  });
 
   verificarConexion();
   cargarSolicitudes();
