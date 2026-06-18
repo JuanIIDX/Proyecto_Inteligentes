@@ -1,25 +1,24 @@
 """
-Cliente de Supabase.
+Engine de SQLAlchemy para Azure Database for PostgreSQL.
 
-Con supabase-py NO usamos un ORM ni una sesión SQL tradicional: trabajamos
-contra la API REST de Supabase a través de un único cliente. Este módulo crea
-ese cliente una sola vez (cacheado) y lo expone para que los repositorios lo
-reutilicen.
+Sustituye al cliente de Supabase: aquí trabajamos con SQL directo a través de
+SQLAlchemy Core (sin ORM), usando un único Engine (pool de conexiones)
+compartido por toda la aplicación.
 """
 
 from functools import lru_cache
 
-from supabase import Client, create_client
+from sqlalchemy import Engine, create_engine
 
 from app.core.config import settings
 
 
 @lru_cache
-def get_supabase() -> Client:
+def get_engine() -> Engine:
     """
-    Devuelve una instancia única (cacheada) del cliente de Supabase.
+    Devuelve una instancia única (cacheada) del Engine de SQLAlchemy.
 
-    Usa la SUPABASE_KEY (service_role en el backend), lo que permite operar
-    sobre las tablas saltando las políticas RLS desde el servidor.
+    El Engine mantiene un pool de conexiones hacia Azure Database for
+    PostgreSQL; se crea una sola vez y se reutiliza en toda la app.
     """
-    return create_client(settings.supabase_url, settings.supabase_key)
+    return create_engine(settings.database_url, pool_pre_ping=True)

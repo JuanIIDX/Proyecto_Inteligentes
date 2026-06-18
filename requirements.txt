@@ -11,8 +11,9 @@ langchain-core==0.3.29
 langchain-openai==0.3.0
 langchain-community==0.3.14
 
-# ===== Base de datos (Supabase) =====
-supabase==2.11.0
+# ===== Base de datos (Azure Database for PostgreSQL) =====
+sqlalchemy==2.0.36
+psycopg[binary]==3.2.3
 
 # ===== Utilidades =====
 tenacity==9.0.0

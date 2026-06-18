@@ -1,10 +1,10 @@
 """
-Repositorio de acceso a datos (Supabase).
+Repositorio de acceso a datos (Azure Database for PostgreSQL).
 
-Encapsula TODAS las operaciones contra las tablas de Supabase mediante
-supabase-py. El resto del sistema (servicio, API) nunca habla directamente con
-Supabase: solo usa estos métodos. Esto mantiene el acceso a datos en un único
-lugar y facilita pruebas y mantenimiento.
+Encapsula TODAS las operaciones contra las tablas de la base de datos mediante
+SQLAlchemy Core. El resto del sistema (servicio, API) nunca habla directamente
+con la base de datos: solo usa estos métodos. Esto mantiene el acceso a datos
+en un único lugar y facilita pruebas y mantenimiento.
 
 Tablas: solicitudes, funcionarios, asignaciones.
 """
@@ -12,72 +12,69 @@ Tablas: solicitudes, funcionarios, asignaciones.
 import logging
 from typing import Any
 
-from supabase import Client
+from sqlalchemy import Engine, text
 
-from app.db.session import get_supabase
+from app.db.session import get_engine
 
 logger = logging.getLogger(__name__)
 
 
 class SupabaseRepository:
-    """Operaciones CRUD sobre Supabase para el dominio de solicitudes."""
+    """Operaciones CRUD sobre PostgreSQL para el dominio de solicitudes."""
 
-    def __init__(self, client: Client | None = None) -> None:
-        # Permite inyectar un cliente en pruebas; por defecto usa el global.
-        self.db: Client = client or get_supabase()
+    def __init__(self, engine: Engine | None = None) -> None:
+        # Permite inyectar un engine en pruebas; por defecto usa el global.
+        self.db: Engine = engine or get_engine()
 
     # ------------------------------------------------------------------ #
     #  SOLICITUDES
     # ------------------------------------------------------------------ #
-    # PostgREST permite "embeber" la tabla relacionada (asignaciones) en la
-    # misma consulta gracias a la foreign key solicitud_id -> solicitudes.id.
-    # Así evitamos una segunda consulta manual para resolver el responsable.
-    _SELECT_CON_RESPONSABLE = "*, asignaciones(responsable)"
-
-    @staticmethod
-    def _aplanar_responsable(fila: dict[str, Any]) -> dict[str, Any]:
-        """Extrae 'responsable' de la asignación embebida hacia el nivel raíz."""
-        asignaciones = fila.pop("asignaciones", None) or []
-        fila["responsable"] = asignaciones[0]["responsable"] if asignaciones else None
-        return fila
+    # LEFT JOIN con asignaciones para resolver el responsable en una sola
+    # consulta, igual que hacía el "embed" de PostgREST en Supabase.
+    _SELECT_CON_RESPONSABLE = """
+        select s.*, a.responsable as responsable
+        from public.solicitudes s
+        left join public.asignaciones a on a.solicitud_id = s.id
+    """
 
     def obtener_solicitudes(self, limite: int = 50) -> list[dict[str, Any]]:
         """Devuelve las solicitudes más recientes, con su responsable asignado."""
-        resp = (
-            self.db.table("solicitudes")
-            .select(self._SELECT_CON_RESPONSABLE)
-            .order("creado_en", desc=True)
-            .limit(limite)
-            .execute()
+        sql = text(
+            self._SELECT_CON_RESPONSABLE
+            + " order by s.creado_en desc limit :limite"
         )
-        return [self._aplanar_responsable(fila) for fila in resp.data]
+        with self.db.connect() as conn:
+            filas = conn.execute(sql, {"limite": limite}).mappings().all()
+        return [dict(fila) for fila in filas]
 
     def obtener_solicitudes_pendientes(self) -> list[dict[str, Any]]:
         """Devuelve las solicitudes en estado 'pendiente' (lote para A*)."""
-        resp = (
-            self.db.table("solicitudes")
-            .select("*")
-            .eq("estado", "pendiente")
-            .order("creado_en")
-            .execute()
+        sql = text(
+            "select * from public.solicitudes "
+            "where estado = 'pendiente' order by creado_en"
         )
-        return resp.data
+        with self.db.connect() as conn:
+            filas = conn.execute(sql).mappings().all()
+        return [dict(fila) for fila in filas]
 
     def obtener_solicitud(self, solicitud_id: int) -> dict[str, Any] | None:
         """Devuelve una solicitud por id (con responsable), o None si no existe."""
-        resp = (
-            self.db.table("solicitudes")
-            .select(self._SELECT_CON_RESPONSABLE)
-            .eq("id", solicitud_id)
-            .limit(1)
-            .execute()
-        )
-        return self._aplanar_responsable(resp.data[0]) if resp.data else None
+        sql = text(self._SELECT_CON_RESPONSABLE + " where s.id = :id limit 1")
+        with self.db.connect() as conn:
+            fila = conn.execute(sql, {"id": solicitud_id}).mappings().first()
+        return dict(fila) if fila else None
 
     def crear_solicitud(self, datos: dict[str, Any]) -> dict[str, Any]:
         """Inserta una solicitud y devuelve el registro creado."""
-        resp = self.db.table("solicitudes").insert(datos).execute()
-        return resp.data[0]
+        columnas = ", ".join(datos.keys())
+        marcadores = ", ".join(f":{clave}" for clave in datos)
+        sql = text(
+            f"insert into public.solicitudes ({columnas}) "
+            f"values ({marcadores}) returning *"
+        )
+        with self.db.begin() as conn:
+            fila = conn.execute(sql, datos).mappings().first()
+        return dict(fila)
 
     def actualizar_solicitud(
         self, solicitud_id: int, cambios: dict[str, Any]
@@ -85,46 +82,64 @@ class SupabaseRepository:
         """Actualiza una solicitud y devuelve el registro actualizado."""
         if not cambios:
             return self.obtener_solicitud(solicitud_id)
-        resp = (
-            self.db.table("solicitudes")
-            .update(cambios)
-            .eq("id", solicitud_id)
-            .execute()
+        asignaciones = ", ".join(f"{clave} = :{clave}" for clave in cambios)
+        sql = text(
+            f"update public.solicitudes set {asignaciones} "
+            f"where id = :id returning *"
         )
-        return resp.data[0] if resp.data else None
+        with self.db.begin() as conn:
+            fila = conn.execute(sql, {**cambios, "id": solicitud_id}).mappings().first()
+        return dict(fila) if fila else None
 
     # ------------------------------------------------------------------ #
     #  FUNCIONARIOS
     # ------------------------------------------------------------------ #
     def obtener_funcionarios(self) -> list[dict[str, Any]]:
         """Devuelve el catálogo completo de funcionarios."""
-        resp = self.db.table("funcionarios").select("*").order("id").execute()
-        return resp.data
+        sql = text("select * from public.funcionarios order by id")
+        with self.db.connect() as conn:
+            filas = conn.execute(sql).mappings().all()
+        return [dict(fila) for fila in filas]
 
     def obtener_funcionario_por_categoria(
         self, categoria: str
     ) -> dict[str, Any] | None:
         """Busca el funcionario responsable de una categoría dada."""
-        resp = (
-            self.db.table("funcionarios")
-            .select("*")
-            .eq("categoria", categoria)
-            .limit(1)
-            .execute()
+        sql = text(
+            "select * from public.funcionarios "
+            "where categoria = :categoria limit 1"
         )
-        return resp.data[0] if resp.data else None
+        with self.db.connect() as conn:
+            fila = conn.execute(sql, {"categoria": categoria}).mappings().first()
+        return dict(fila) if fila else None
 
     # ------------------------------------------------------------------ #
     #  ASIGNACIONES
     # ------------------------------------------------------------------ #
     def crear_asignacion(self, datos: dict[str, Any]) -> dict[str, Any]:
         """Crea una asignación (solicitud <-> funcionario) y la devuelve."""
-        resp = self.db.table("asignaciones").insert(datos).execute()
-        return resp.data[0]
+        columnas = ", ".join(datos.keys())
+        marcadores = ", ".join(f":{clave}" for clave in datos)
+        sql = text(
+            f"insert into public.asignaciones ({columnas}) "
+            f"values ({marcadores}) returning *"
+        )
+        with self.db.begin() as conn:
+            fila = conn.execute(sql, datos).mappings().first()
+        return dict(fila)
 
     def crear_asignaciones(self, filas: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Inserta varias asignaciones en una sola operación (resultado de A*)."""
         if not filas:
             return []
-        resp = self.db.table("asignaciones").insert(filas).execute()
-        return resp.data
+        columnas = ", ".join(filas[0].keys())
+        marcadores = ", ".join(f":{clave}" for clave in filas[0])
+        sql = text(
+            f"insert into public.asignaciones ({columnas}) "
+            f"values ({marcadores}) returning *"
+        )
+        with self.db.begin() as conn:
+            resultado = [
+                dict(conn.execute(sql, fila).mappings().first()) for fila in filas
+            ]
+        return resultado

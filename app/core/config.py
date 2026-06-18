@@ -25,9 +25,8 @@ class Settings(BaseSettings):
     azure_openai_api_version: str = "2024-10-21"
     llm_temperature: float = 0.1
 
-    # ---- Supabase ----
-    supabase_url: str
-    supabase_key: str
+    # ---- Base de datos (Azure Database for PostgreSQL) ----
+    database_url: str
 
     # Lee el archivo .env, ignora variables extra y es insensible a mayúsculas.
     model_config = SettingsConfigDict(
