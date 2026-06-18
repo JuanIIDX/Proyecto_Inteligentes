@@ -1,0 +1,20 @@
+# Entorno
+.venv/
+venv/
+env/
+
+# Variables sensibles
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# IDE
+.idea/
+.vscode/
+
+# Logs
+*.log

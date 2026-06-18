@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistema Inteligente de Solicitudes Universitarias</title>
+<style>
+  :root {
+    --azul: #1a4d8f;
+    --azul-claro: #eaf1fb;
+    --gris: #6b7280;
+    --borde: #d8dee8;
+    --alta: #c0392b;
+    --media: #b8860b;
+    --baja: #2e7d32;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: system-ui, -apple-system, Segoe UI, Arial, sans-serif;
+    background: #f5f7fa;
+    color: #1f2937;
+    margin: 0;
+    padding: 2rem 1rem 4rem;
+  }
+  header {
+    max-width: 900px;
+    margin: 0 auto 1.5rem;
+    text-align: center;
+  }
+  header h1 { margin: 0 0 0.3rem; font-size: 1.5rem; color: var(--azul); }
+  header p { margin: 0; color: var(--gris); font-size: 0.9rem; }
+
+  .contenedor { max-width: 900px; margin: 0 auto; display: grid; gap: 1.5rem; }
+
+  .tarjeta {
+    background: #fff;
+    border: 1px solid var(--borde);
+    border-radius: 10px;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .tarjeta h2 {
+    margin: 0 0 1rem;
+    font-size: 1.05rem;
+    color: var(--azul);
+  }
+
+  label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.3rem; margin-top: 0.9rem; }
+  input, textarea {
+    width: 100%;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--borde);
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-family: inherit;
+    resize: vertical;
+  }
+  input:focus, textarea:focus { outline: 2px solid var(--azul); outline-offset: 1px; }
+
+  button {
+    margin-top: 1.2rem;
+    background: var(--azul);
+    color: #fff;
+    border: none;
+    padding: 0.65rem 1.3rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:hover { background: #143d72; }
+  button:disabled { background: #94a3b8; cursor: not-allowed; }
+
+  #estado-conexion {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+    color: var(--gris);
+    margin-top: 0.5rem;
+  }
+  .punto { width: 8px; height: 8px; border-radius: 50%; background: #aaa; }
+  .punto.ok { background: #2e7d32; }
+  .punto.error { background: var(--alta); }
+
+  #resultado {
+    margin-top: 1.2rem;
+    padding: 1rem;
+    border-radius: 8px;
+    border: 1px solid var(--borde);
+    background: var(--azul-claro);
+    font-size: 0.88rem;
+    display: none;
+  }
+  #resultado.error { background: #fdecea; border-color: #f1b0a8; color: var(--alta); }
+  #resultado dl { margin: 0; display: grid; grid-template-columns: 130px 1fr; gap: 0.35rem 0.6rem; }
+  #resultado dt { font-weight: 600; color: var(--gris); }
+  #resultado dd { margin: 0; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th, td { text-align: left; padding: 0.55rem 0.6rem; border-bottom: 1px solid var(--borde); vertical-align: top; }
+  th { color: var(--gris); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; }
+  tr:last-child td { border-bottom: none; }
+
+  .badge {
+    display: inline-block;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #fff;
+  }
+  .badge.Alta { background: var(--alta); }
+  .badge.Media { background: var(--media); }
+  .badge.Baja { background: var(--baja); }
+
+  .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; }
+  .toolbar button {
+    margin-top: 0;
+    background: #fff;
+    color: var(--azul);
+    border: 1px solid var(--azul);
+    padding: 0.4rem 0.9rem;
+    font-size: 0.8rem;
+  }
+  .toolbar button:hover { background: var(--azul-claro); }
+
+  .vacio { color: var(--gris); font-size: 0.85rem; padding: 1rem 0; text-align: center; }
+  .descripcion-celda { max-width: 220px; }
+
+  .metricas {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.7rem;
+    margin-bottom: 1rem;
+  }
+  .metrica {
+    background: var(--azul-claro);
+    border-radius: 8px;
+    padding: 0.7rem 0.9rem;
+    text-align: center;
+  }
+  .metrica span { display: block; font-size: 0.72rem; color: var(--gris); text-transform: uppercase; margin-bottom: 0.2rem; }
+  .metrica strong { font-size: 1.2rem; color: var(--azul); }
+
+  .aviso-sin-solucion {
+    background: #fdecea;
+    border: 1px solid #f1b0a8;
+    color: var(--alta);
+    border-radius: 6px;
+    padding: 0.6rem 0.8rem;
+    font-size: 0.82rem;
+    margin-bottom: 1rem;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Sistema Inteligente de Solicitudes Universitarias</h1>
+  <p>Cliente de prueba — FastAPI + LangChain + Azure OpenAI + Supabase</p>
+  <div id="estado-conexion"><span class="punto" id="punto-conexion"></span><span id="texto-conexion">Verificando conexión...</span></div>
+</header>
+
+<div class="contenedor">
+
+  <section class="tarjeta">
+    <h2>Nueva solicitud</h2>
+    <form id="form-solicitud">
+      <label for="asunto">Asunto</label>
+      <input type="text" id="asunto" name="asunto" maxlength="200" minlength="3" required
+             placeholder="Ej: No puedo acceder a Moodle">
+
+      <label for="descripcion">Descripción</label>
+      <textarea id="descripcion" name="descripcion" rows="4" maxlength="2000" minlength="5" required
+                placeholder="Describe el problema o la solicitud con el mayor detalle posible..."></textarea>
+
+      <label for="solicitante">Solicitante (opcional)</label>
+      <input type="text" id="solicitante" name="solicitante" maxlength="120"
+             placeholder="Ej: Juan Pérez - Estudiante Ing. Sistemas">
+
+      <button type="submit" id="btn-enviar">Clasificar y enviar</button>
+    </form>
+
+    <div id="resultado"></div>
+  </section>
+
+  <section class="tarjeta">
+    <div class="toolbar">
+      <h2 style="margin:0;">Historial de solicitudes</h2>
+      <button id="btn-refrescar" type="button">Refrescar</button>
+    </div>
+    <div id="contenedor-tabla">
+      <p class="vacio">Cargando...</p>
+    </div>
+  </section>
+
+  <section class="tarjeta">
+    <div class="toolbar">
+      <h2 style="margin:0;">Optimización de asignaciones (A*)</h2>
+      <button id="btn-optimizar" type="button">Optimizar asignaciones pendientes</button>
+    </div>
+    <p style="margin:0 0 1rem; color:var(--gris); font-size:0.85rem;">
+      Ejecuta una búsqueda A* sobre todas las solicitudes pendientes y elige,
+      para todo el lote a la vez, la combinación de funcionarios que minimiza
+      el costo total (carga + tiempo de respuesta + urgencia desalineada).
+    </p>
+    <div id="contenedor-astar">
+      <p class="vacio">Aún no se ha ejecutado la optimización.</p>
+    </div>
+  </section>
+
+</div>
+
+<script>
+  const API_BASE = "http://127.0.0.1:8000";
+
+  const form = document.getElementById("form-solicitud");
+  const btnEnviar = document.getElementById("btn-enviar");
+  const divResultado = document.getElementById("resultado");
+  const contenedorTabla = document.getElementById("contenedor-tabla");
+  const btnRefrescar = document.getElementById("btn-refrescar");
+  const puntoConexion = document.getElementById("punto-conexion");
+  const textoConexion = document.getElementById("texto-conexion");
+  const btnOptimizar = document.getElementById("btn-optimizar");
+  const contenedorAstar = document.getElementById("contenedor-astar");
+
+  function escapeHtml(texto) {
+    const div = document.createElement("div");
+    div.textContent = texto ?? "";
+    return div.innerHTML;
+  }
+
+  async function verificarConexion() {
+    try {
+      const resp = await fetch(`${API_BASE}/health`);
+      if (!resp.ok) throw new Error();
+      puntoConexion.classList.add("ok");
+      textoConexion.textContent = "Conectado a la API (" + API_BASE + ")";
+    } catch {
+      puntoConexion.classList.add("error");
+      textoConexion.textContent = "No se pudo conectar a " + API_BASE + " — ¿está el servidor corriendo?";
+    }
+  }
+
+  function mostrarResultado(datos, esError) {
+    divResultado.style.display = "block";
+    divResultado.classList.toggle("error", esError);
+
+    if (esError) {
+      divResultado.innerHTML = `<strong>Error:</strong> ${escapeHtml(datos)}`;
+      return;
+    }
+
+    divResultado.innerHTML = `
+      <dl>
+        <dt>ID</dt><dd>#${datos.id}</dd>
+        <dt>Categoría</dt><dd>${escapeHtml(datos.categoria)}</dd>
+        <dt>Prioridad</dt><dd><span class="badge ${datos.prioridad}">${escapeHtml(datos.prioridad)}</span></dd>
+        <dt>Responsable</dt><dd>${escapeHtml(datos.responsable)}</dd>
+        <dt>Razonamiento</dt><dd>${escapeHtml(datos.razonamiento)}</dd>
+      </dl>
+    `;
+  }
+
+  function renderizarTabla(solicitudes) {
+    if (!solicitudes.length) {
+      contenedorTabla.innerHTML = '<p class="vacio">Aún no hay solicitudes registradas.</p>';
+      return;
+    }
+
+    const filas = solicitudes.map(s => `
+      <tr>
+        <td>#${s.id}</td>
+        <td>${escapeHtml(s.asunto)}</td>
+        <td class="descripcion-celda">${escapeHtml(s.descripcion)}</td>
+        <td>${escapeHtml(s.categoria ?? "—")}</td>
+        <td>${s.prioridad ? `<span class="badge ${s.prioridad}">${escapeHtml(s.prioridad)}</span>` : "—"}</td>
+        <td>${escapeHtml(s.responsable ?? "—")}</td>
+        <td>${escapeHtml(s.estado)}</td>
+      </tr>
+    `).join("");
+
+    contenedorTabla.innerHTML = `
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th><th>Asunto</th><th>Descripción</th><th>Categoría</th>
+            <th>Prioridad</th><th>Responsable</th><th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>${filas}</tbody>
+      </table>
+    `;
+  }
+
+  async function cargarSolicitudes() {
+    contenedorTabla.innerHTML = '<p class="vacio">Cargando...</p>';
+    try {
+      const resp = await fetch(`${API_BASE}/solicitudes?limite=50`);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const datos = await resp.json();
+      renderizarTabla(datos);
+    } catch (err) {
+      contenedorTabla.innerHTML = `<p class="vacio">Error cargando el historial: ${escapeHtml(err.message)}</p>`;
+    }
+  }
+
+  form.addEventListener("submit", async (evento) => {
+    evento.preventDefault();
+    btnEnviar.disabled = true;
+    btnEnviar.textContent = "Clasificando con IA...";
+    divResultado.style.display = "none";
+
+    const payload = {
+      asunto: form.asunto.value.trim(),
+      descripcion: form.descripcion.value.trim(),
+      solicitante: form.solicitante.value.trim() || null,
+    };
+
+    try {
+      const resp = await fetch(`${API_BASE}/solicitudes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const datos = await resp.json();
+
+      if (!resp.ok) {
+        throw new Error(datos.detail || `HTTP ${resp.status}`);
+      }
+
+      mostrarResultado(datos, false);
+      form.reset();
+      await cargarSolicitudes();
+    } catch (err) {
+      mostrarResultado(err.message, true);
+    } finally {
+      btnEnviar.disabled = false;
+      btnEnviar.textContent = "Clasificar y enviar";
+    }
+  });
+
+  function renderizarAstar(resultado) {
+    const avisoSinSolucion = resultado.sin_solucion.length
+      ? `<div class="aviso-sin-solucion">
+           Sin funcionario candidato disponible para las solicitudes:
+           ${resultado.sin_solucion.map(id => `#${id}`).join(", ")}
+         </div>`
+      : "";
+
+    const filasAsignaciones = resultado.asignaciones.map(a => `
+      <tr>
+        <td>#${a.solicitud_id}</td>
+        <td>${escapeHtml(a.funcionario_nombre)}</td>
+        <td>${a.costo.toFixed(3)}</td>
+      </tr>
+    `).join("");
+
+    const tabla = resultado.asignaciones.length
+      ? `<table>
+           <thead><tr><th>Solicitud</th><th>Funcionario asignado</th><th>Costo g(n)</th></tr></thead>
+           <tbody>${filasAsignaciones}</tbody>
+         </table>`
+      : '<p class="vacio">No había solicitudes pendientes por asignar.</p>';
+
+    contenedorAstar.innerHTML = `
+      <div class="metricas">
+        <div class="metrica"><span>Nodos explorados</span><strong>${resultado.nodos_explorados}</strong></div>
+        <div class="metrica"><span>Tiempo de ejecución</span><strong>${resultado.tiempo_ejecucion_ms.toFixed(2)} ms</strong></div>
+        <div class="metrica"><span>Costo total</span><strong>${resultado.costo_total.toFixed(3)}</strong></div>
+        <div class="metrica"><span>Asignaciones</span><strong>${resultado.asignaciones.length}</strong></div>
+      </div>
+      ${avisoSinSolucion}
+      ${tabla}
+    `;
+  }
+
+  btnOptimizar.addEventListener("click", async () => {
+    btnOptimizar.disabled = true;
+    btnOptimizar.textContent = "Optimizando...";
+    contenedorAstar.innerHTML = '<p class="vacio">Ejecutando búsqueda A*...</p>';
+
+    try {
+      const resp = await fetch(`${API_BASE}/optimizar-asignaciones`, { method: "POST" });
+      const datos = await resp.json();
+      if (!resp.ok) throw new Error(datos.detail || `HTTP ${resp.status}`);
+      renderizarAstar(datos);
+      await cargarSolicitudes();
+    } catch (err) {
+      contenedorAstar.innerHTML = `<p class="vacio">Error optimizando: ${escapeHtml(err.message)}</p>`;
+    } finally {
+      btnOptimizar.disabled = false;
+      btnOptimizar.textContent = "Optimizar asignaciones pendientes";
+    }
+  });
+
+  btnRefrescar.addEventListener("click", cargarSolicitudes);
+
+  verificarConexion();
+  cargarSolicitudes();
+</script>
+
+</body>
+</html>
