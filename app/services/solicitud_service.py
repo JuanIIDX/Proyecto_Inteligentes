@@ -140,14 +140,17 @@ class SolicitudService:
             for s in base
             if s.get("categoria") and s.get("prioridad")
         ]
+        # PostgreSQL devuelve las columnas numéricas como Decimal; se convierten
+        # a int/float aquí para que las funciones de costo (que mezclan con
+        # float) no fallen con "unsupported operand: float * Decimal".
         candidatos = [
             FuncionarioCandidato(
                 id=f["id"],
                 nombre=f["nombre"],
                 especialidad=f.get("especialidad") or f["categoria"],
-                carga_actual=f.get("carga_actual", 0),
-                tiempo_promedio_respuesta=f.get("tiempo_promedio_respuesta", 1),
-                disponibilidad_horas=f.get("disponibilidad_horas", 8),
+                carga_actual=int(f.get("carga_actual", 0)),
+                tiempo_promedio_respuesta=float(f.get("tiempo_promedio_respuesta", 1)),
+                disponibilidad_horas=int(f.get("disponibilidad_horas", 8)),
             )
             for f in funcionarios
         ]
