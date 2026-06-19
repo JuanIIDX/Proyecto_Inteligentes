@@ -83,6 +83,29 @@ def get_contexto_runnable() -> Runnable:
     return get_retriever() | RunnableLambda(_formatear_documentos)
 
 
+def recuperar_contexto_con_fuentes(consulta: str) -> tuple[str, list[str]]:
+    """
+    Recupera el contexto formateado Y la lista de fuentes (documentos) usadas.
+
+    A diferencia de `get_contexto_runnable` (que solo devuelve el texto), aquí se
+    exponen también los nombres de los documentos de los que salió el contexto.
+    Esto permite que la clasificación informe SI se apoyó en algún documento y en
+    cuál, haciendo la justificación verificable.
+
+    Devuelve (contexto_formateado, fuentes). Si no se recuperó nada, las fuentes
+    vienen vacías y el contexto es el texto neutro de "sin normativa relevante".
+    """
+    documentos: list[Document] = get_retriever().invoke(consulta)
+    contexto = _formatear_documentos(documentos)
+    # Fuentes únicas, conservando el orden de aparición.
+    fuentes = list(
+        dict.fromkeys(
+            str(doc.metadata.get("fuente", "desconocida")) for doc in documentos
+        )
+    )
+    return contexto, fuentes
+
+
 def construir_consulta(asunto: str, descripcion: str) -> str:
     """
     Construye el texto de búsqueda a partir de asunto y descripción.

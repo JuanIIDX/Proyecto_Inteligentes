@@ -47,7 +47,14 @@ class SolicitudService:
             asunto=datos.asunto, descripcion=datos.descripcion
         )
 
-        # 2) Persistir la solicitud con su clasificación.
+        # 2) Componer la justificación final indicando si se revisó normativa
+        #    (RAG). Así la justificación es verificable: deja claro si la decisión
+        #    se apoyó en algún documento institucional y en cuál.
+        razonamiento = self._componer_razonamiento(
+            clasificacion["razonamiento"], clasificacion.get("fuentes", [])
+        )
+
+        # 3) Persistir la solicitud con su clasificación.
         solicitud = self.repo.crear_solicitud(
             {
                 "asunto": datos.asunto,
@@ -55,12 +62,12 @@ class SolicitudService:
                 "solicitante": datos.solicitante,
                 "categoria": clasificacion["categoria"].value,
                 "prioridad": clasificacion["prioridad"].value,
-                "razonamiento": clasificacion["razonamiento"],
+                "razonamiento": razonamiento,
                 "estado": "asignada",
             }
         )
 
-        # 3) Crear la asignación al funcionario de esa categoría.
+        # 4) Crear la asignación al funcionario de esa categoría.
         funcionario = self.repo.obtener_funcionario_por_categoria(
             clasificacion["categoria"].value
         )
@@ -74,9 +81,30 @@ class SolicitudService:
 
         logger.info("Solicitud #%s procesada y asignada.", solicitud["id"])
 
-        # Devolvemos la solicitud enriquecida con el responsable (campo derivado).
+        # Devolvemos la solicitud enriquecida con campos derivados.
         solicitud["responsable"] = clasificacion["responsable"]
+        solicitud["fuentes"] = clasificacion.get("fuentes", [])
         return solicitud
+
+    @staticmethod
+    def _componer_razonamiento(razonamiento: str, fuentes: list[str]) -> str:
+        """
+        Añade al razonamiento del LLM una nota sobre la consulta documental.
+
+        Si se recuperó normativa/histórico del vector store, indica de qué
+        documentos salió; si no, deja constancia de que no se encontró normativa
+        aplicable y que se clasificó solo con el contenido de la solicitud. Así la
+        justificación muestra siempre SI se revisó algún documento.
+        """
+        if fuentes:
+            listado = ", ".join(fuentes)
+            nota = f"Documentos consultados: {listado}."
+        else:
+            nota = (
+                "No se encontró normativa institucional aplicable; la "
+                "clasificación se basó únicamente en el contenido de la solicitud."
+            )
+        return f"{razonamiento.strip()} {nota}"
 
     # ------------------------------------------------------------------ #
     #  Consultas / actualización

@@ -24,7 +24,7 @@ import logging
 from functools import lru_cache
 from typing import Any
 
-from langchain_core.runnables import Runnable, RunnableLambda
+from langchain_core.runnables import Runnable, RunnableLambda, RunnablePassthrough
 
 from app.chains.llm import get_llm
 from app.chains.prompts import get_clasificacion_prompt
@@ -49,37 +49,40 @@ def _preparar_entrada(data: dict[str, Any]) -> dict[str, Any]:
     dependa de pgvector cuando RAG está apagado.
     """
     if not settings.rag_enabled:
-        return {**data, "contexto": _CONTEXTO_VACIO}
+        return {**data, "contexto": _CONTEXTO_VACIO, "fuentes": []}
 
-    from app.chains.retriever import construir_consulta, get_contexto_runnable
+    from app.chains.retriever import construir_consulta, recuperar_contexto_con_fuentes
 
     consulta = construir_consulta(data["asunto"], data["descripcion"])
     try:
-        contexto = get_contexto_runnable().invoke(consulta)
+        contexto, fuentes = recuperar_contexto_con_fuentes(consulta)
     except Exception:
         # Si el vector store falla (sin extensión, sin documentos, etc.) no
         # rompemos la clasificación: degradamos a contexto vacío y avisamos.
         logger.exception("Fallo al recuperar contexto RAG; se clasifica sin él.")
-        contexto = _CONTEXTO_VACIO
+        contexto, fuentes = _CONTEXTO_VACIO, []
 
-    return {**data, "contexto": contexto}
+    return {**data, "contexto": contexto, "fuentes": fuentes}
 
 
 def _agregar_responsable(data: dict[str, Any]) -> dict[str, Any]:
     """
     Paso de LCEL: toma la clasificación del LLM e invoca la Tool de asignación.
 
-    Recibe {'clasificacion': ClasificacionResult} y devuelve un diccionario
-    enriquecido con el responsable asignado.
+    Recibe {'clasificacion': ClasificacionResult, 'fuentes': [...]} y devuelve un
+    diccionario enriquecido con el responsable asignado y las fuentes (documentos)
+    que se consultaron para clasificar.
     """
     clasificacion: ClasificacionResult = data["clasificacion"]
+    fuentes: list[str] = data.get("fuentes", [])
     responsable = asignar_responsable_seguro(clasificacion.categoria)
 
     logger.info(
-        "Clasificación -> categoria=%s prioridad=%s responsable=%s",
+        "Clasificación -> categoria=%s prioridad=%s responsable=%s fuentes=%s",
         clasificacion.categoria.value,
         clasificacion.prioridad.value,
         responsable,
+        fuentes,
     )
 
     return {
@@ -87,6 +90,7 @@ def _agregar_responsable(data: dict[str, Any]) -> dict[str, Any]:
         "prioridad": clasificacion.prioridad,
         "razonamiento": clasificacion.razonamiento,
         "responsable": responsable,
+        "fuentes": fuentes,
     }
 
 
@@ -96,11 +100,14 @@ def get_clasificacion_chain() -> Runnable:
     Construye y cachea la cadena LCEL completa.
 
     Pipeline:
-        _preparar_entrada (añade {contexto} vía RAG)
-                                     -> prompt | llm_estructurado
-                                     -> ClasificacionResult
-                                     -> {'clasificacion': ...}
+        _preparar_entrada (añade {contexto} y {fuentes} vía RAG)
+                                     -> assign(clasificacion = prompt | llm)
+                                     -> {'clasificacion': ..., 'fuentes': [...]}
                                      -> _agregar_responsable
+
+    Se usa RunnablePassthrough.assign para correr el LLM conservando las
+    {fuentes} recuperadas: así sabemos qué documentos se consultaron y podemos
+    reportarlo en la respuesta.
     """
     prompt = get_clasificacion_prompt()
 
@@ -108,13 +115,10 @@ def get_clasificacion_chain() -> Runnable:
     # ClasificacionResult, eliminando la necesidad de parsear texto a mano.
     llm_estructurado = get_llm().with_structured_output(ClasificacionResult)
 
-    # Subcadena: recupera contexto -> prompt -> LLM. El resultado se etiqueta
-    # como 'clasificacion'.
-    clasificador: Runnable = (
-        RunnableLambda(_preparar_entrada)
-        | prompt
-        | llm_estructurado
-        | RunnableLambda(lambda r: {"clasificacion": r})
+    # Subcadena: recupera contexto -> añade 'clasificacion' (prompt | LLM) al
+    # dict SIN perder 'fuentes', que se propagan intactas.
+    clasificador: Runnable = RunnableLambda(_preparar_entrada) | RunnablePassthrough.assign(
+        clasificacion=prompt | llm_estructurado
     )
 
     # Cadena final: clasifica y luego asigna el responsable vía Tool.

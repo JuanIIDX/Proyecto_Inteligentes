@@ -91,6 +91,11 @@ class SolicitudResponse(BaseModel):
     responsable: Optional[str] = Field(
         default=None, description="Área o persona responsable asignada."
     )
+    fuentes: list[str] = Field(
+        default_factory=list,
+        description="Documentos (normativa/histórico) consultados por el RAG "
+        "para clasificar. Vacío si no se revisó ninguno.",
+    )
     creado_en: Optional[datetime] = None
 
 
