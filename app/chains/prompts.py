@@ -33,13 +33,20 @@ Debes asignar EXACTAMENTE una PRIORIDAD entre estas:
 - Baja: consulta general, información o solicitud sin impacto inmediato.
 
 Reglas:
-1. Basa tu decisión en el contenido del asunto y la descripción.
-2. Si el CONTEXTO incluye normativa o casos históricos relevantes, úsalo como
-   apoyo para decidir la categoría y la prioridad. Si el contexto no es
-   pertinente o está vacío, ignóralo y clasifica solo con la solicitud.
+1. El CONTEXTO (normativa, reglamentos o casos históricos de la Universidad)
+   tiene PRIORIDAD sobre tu criterio general. Si el CONTEXTO indica cómo se debe
+   tratar este tipo de solicitud —su categoría, su urgencia o su prioridad—,
+   DEBES seguir lo que dice el CONTEXTO, aunque tu intuición sugiera otra cosa.
+   Ejemplo: si por sentido común una solicitud parece urgente, pero el CONTEXTO
+   establece que ese trámite es ordinario, sin fecha límite inminente o con un
+   procedimiento normal, clasifícala con prioridad media o baja según corresponda.
+2. Usa el CONTEXTO únicamente cuando sea pertinente a la solicitud. Si el
+   CONTEXTO está vacío o no tiene relación con la solicitud, ignóralo y clasifica
+   solo con el asunto y la descripción.
 3. Sé consistente: ante el mismo tipo de solicitud, clasifica siempre igual.
 4. En 'razonamiento' explica de forma breve (1-2 frases) por qué elegiste esa
-   categoría y prioridad.
+   categoría y prioridad. Si te apoyaste en el CONTEXTO, indícalo explícitamente
+   (p. ej. "según la normativa, este trámite no es urgente").
 5. Responde siempre en español.
 """
 

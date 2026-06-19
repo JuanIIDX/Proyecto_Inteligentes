@@ -26,9 +26,11 @@ class Settings(BaseSettings):
     llm_temperature: float = 0.1
 
     # ---- RAG (Retrieval-Augmented Generation) ----
-    # Activa/desactiva el paso de recuperación de contexto en la cadena. Si está
-    # en False (por defecto), el sistema clasifica como hasta ahora, sin RAG.
-    rag_enabled: bool = False
+    # Activa/desactiva el paso de recuperación de contexto en la cadena. Por
+    # defecto está en True: /solicitudes siempre consulta la normativa/histórico
+    # del vector store antes de clasificar. Se puede desactivar con RAG_ENABLED=False
+    # en el .env si se quiere clasificar sin RAG.
+    rag_enabled: bool = True
     # Deployment del modelo de embeddings en Azure (p. ej. text-embedding-3-small).
     azure_openai_embeddings_deployment: str = "text-embedding-3-small"
     # Nombre de la colección de pgvector donde se guardan los documentos indexados.
