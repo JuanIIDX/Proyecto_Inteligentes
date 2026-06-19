@@ -11,9 +11,7 @@ import logging
 from fastapi import APIRouter, HTTPException, status
 
 from app.schemas.solicitud import (
-    ComparacionTecnicasResponse,
     FuncionarioResponse,
-    OptimizacionResponse,
     SolicitudRequest,
     SolicitudResponse,
     SolicitudUpdate,
@@ -95,57 +93,6 @@ def actualizar_solicitud(
             status_code=status.HTTP_404_NOT_FOUND, detail="Solicitud no encontrada."
         )
     return SolicitudResponse.model_validate(solicitud)
-
-
-# ---------------------------------------------------------------------- #
-#  Optimización (A*)
-# ---------------------------------------------------------------------- #
-@router.post(
-    "/optimizar-asignaciones",
-    response_model=OptimizacionResponse,
-    summary="Asignar de forma óptima el lote de solicitudes pendientes (A*)",
-)
-def optimizar_asignaciones() -> OptimizacionResponse:
-    """
-    Ejecuta búsqueda A* sobre todas las solicitudes en estado 'pendiente',
-    eligiendo para cada una el funcionario que minimiza el costo total del
-    lote (carga + tiempo de respuesta + urgencia desalineada), persiste las
-    asignaciones resultantes y devuelve las métricas de la búsqueda.
-    """
-    service = SolicitudService()
-    try:
-        resultado = service.optimizar_asignaciones()
-    except Exception as exc:  # noqa: BLE001
-        logger.exception("Error optimizando asignaciones")
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"No se pudo optimizar las asignaciones: {exc}",
-        ) from exc
-    return OptimizacionResponse.model_validate(resultado, from_attributes=True)
-
-
-@router.post(
-    "/comparar-tecnicas",
-    response_model=ComparacionTecnicasResponse,
-    summary="Comparar A* vs BFS/DFS vs Algoritmo Genético sobre el lote pendiente",
-)
-def comparar_tecnicas() -> ComparacionTecnicasResponse:
-    """
-    Resuelve el mismo lote de solicitudes pendientes con las cuatro técnicas
-    (A*, BFS, DFS y genético) y devuelve sus métricas para comparar y graficar.
-
-    Es solo evaluación: NO persiste asignaciones ni cambia estados.
-    """
-    service = SolicitudService()
-    try:
-        resultado = service.comparar_tecnicas()
-    except Exception as exc:  # noqa: BLE001
-        logger.exception("Error comparando técnicas")
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"No se pudo comparar las técnicas: {exc}",
-        ) from exc
-    return ComparacionTecnicasResponse.model_validate(resultado, from_attributes=True)
 
 
 # ---------------------------------------------------------------------- #
