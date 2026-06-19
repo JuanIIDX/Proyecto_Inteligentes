@@ -36,7 +36,9 @@ class Settings(BaseSettings):
     # Nombre de la colección de pgvector donde se guardan los documentos indexados.
     rag_collection_name: str = "documentos_universitarios"
     # Número de fragmentos que el retriever inyecta como contexto en el prompt.
-    rag_top_k: int = 3
+    # Con 5 hay más margen para que el artículo/numeral exacto que menciona la
+    # solicitud entre en el contexto recuperado (clave para citar la normativa).
+    rag_top_k: int = 5
 
     # ---- Base de datos (Azure Database for PostgreSQL) ----
     database_url: str
