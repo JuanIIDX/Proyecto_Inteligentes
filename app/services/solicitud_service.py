@@ -112,23 +112,32 @@ class SolicitudService:
     #  Caso de uso: optimizar asignaciones pendientes con A*
     # ------------------------------------------------------------------ #
     def _cargar_problema(
-        self,
+        self, solo_pendientes: bool = True
     ) -> tuple[list[SolicitudPendiente], list[FuncionarioCandidato]]:
         """
-        Carga desde la BD el lote de solicitudes pendientes y los funcionarios,
-        y los convierte a los tipos que usan los algoritmos de optimización.
+        Carga desde la BD el lote de solicitudes y los funcionarios, y los
+        convierte a los tipos que usan los algoritmos de optimización.
 
         Es la entrada común a todas las técnicas (A*, BFS/DFS, genético), para
         que todas resuelvan exactamente el mismo problema.
+
+        - solo_pendientes=True  -> solo solicitudes en estado 'pendiente'. Es lo
+          que usa /optimizar-asignaciones, que asigna y persiste de verdad.
+        - solo_pendientes=False -> todas las solicitudes ya clasificadas. Útil
+          para /comparar-tecnicas, que es solo evaluación y no debería depender
+          de que haya pendientes.
         """
-        pendientes = self.repo.obtener_solicitudes_pendientes()
+        if solo_pendientes:
+            base = self.repo.obtener_solicitudes_pendientes()
+        else:
+            base = self.repo.obtener_solicitudes()
         funcionarios = self.repo.obtener_funcionarios()
 
         solicitudes = [
             SolicitudPendiente(
                 id=s["id"], categoria=s["categoria"], prioridad=s["prioridad"]
             )
-            for s in pendientes
+            for s in base
             if s.get("categoria") and s.get("prioridad")
         ]
         candidatos = [
@@ -197,8 +206,12 @@ class SolicitudService:
         estados, solo ejecuta y mide. La salida está pensada para graficar la
         comparación en el frontend (costo, nodos/generaciones, tiempo) y la
         curva de convergencia del genético.
+
+        Usa TODAS las solicitudes clasificadas (no solo las pendientes), para que
+        la comparación se pueda ejecutar siempre que haya solicitudes, sin
+        depender de su estado.
         """
-        solicitudes, funcionarios = self._cargar_problema()
+        solicitudes, funcionarios = self._cargar_problema(solo_pendientes=False)
 
         a = ejecutar_astar(solicitudes, funcionarios)
         bfs = ejecutar_busqueda_ciega(solicitudes, funcionarios, "BFS")
