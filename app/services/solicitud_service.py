@@ -214,12 +214,37 @@ class SolicitudService:
         la comparación se pueda ejecutar siempre que haya solicitudes, sin
         depender de su estado.
         """
+        logger.info("Comparación: cargando solicitudes y funcionarios...")
         solicitudes, funcionarios = self._cargar_problema(solo_pendientes=False)
+        logger.info(
+            "Comparación: %d solicitudes, %d funcionarios cargados.",
+            len(solicitudes),
+            len(funcionarios),
+        )
 
+        logger.info("Comparación: ejecutando A*...")
         a = ejecutar_astar(solicitudes, funcionarios)
+        logger.info(
+            "Comparación: A* OK (nodos=%d, %.1fms).",
+            a.nodos_explorados,
+            a.tiempo_ejecucion_ms,
+        )
+
+        logger.info("Comparación: ejecutando BFS...")
         bfs = ejecutar_busqueda_ciega(solicitudes, funcionarios, "BFS")
+        logger.info("Comparación: BFS OK (nodos=%d, %.1fms).", bfs.nodos_explorados, bfs.tiempo_ejecucion_ms)
+
+        logger.info("Comparación: ejecutando DFS...")
         dfs = ejecutar_busqueda_ciega(solicitudes, funcionarios, "DFS")
+        logger.info("Comparación: DFS OK (nodos=%d, %.1fms).", dfs.nodos_explorados, dfs.tiempo_ejecucion_ms)
+
+        logger.info("Comparación: ejecutando Algoritmo Genético...")
         gen = ejecutar_genetico(solicitudes, funcionarios)
+        logger.info(
+            "Comparación: Genético OK (generaciones=%d, %.1fms).",
+            gen.generaciones,
+            gen.tiempo_ejecucion_ms,
+        )
 
         # Métricas homogéneas por técnica para graficar barras comparativas.
         # 'esfuerzo' = nodos explorados (búsquedas) o generaciones (genético).
@@ -232,6 +257,7 @@ class SolicitudService:
                 "esfuerzo_etiqueta": "nodos explorados",
                 "tiempo_ejecucion_ms": round(a.tiempo_ejecucion_ms, 4),
                 "optimo": True,
+                "truncado": False,
             },
             {
                 "nombre": "BFS",
@@ -241,6 +267,7 @@ class SolicitudService:
                 "esfuerzo_etiqueta": "nodos explorados",
                 "tiempo_ejecucion_ms": round(bfs.tiempo_ejecucion_ms, 4),
                 "optimo": True,
+                "truncado": bfs.truncado,
             },
             {
                 "nombre": "DFS",
@@ -250,6 +277,7 @@ class SolicitudService:
                 "esfuerzo_etiqueta": "nodos explorados",
                 "tiempo_ejecucion_ms": round(dfs.tiempo_ejecucion_ms, 4),
                 "optimo": True,
+                "truncado": dfs.truncado,
             },
             {
                 "nombre": "Algoritmo Genético",
@@ -259,6 +287,7 @@ class SolicitudService:
                 "esfuerzo_etiqueta": "generaciones",
                 "tiempo_ejecucion_ms": round(gen.tiempo_ejecucion_ms, 4),
                 "optimo": False,
+                "truncado": False,
             },
         ]
 

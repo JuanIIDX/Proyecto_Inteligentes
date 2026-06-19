@@ -180,6 +180,10 @@ class MetricaTecnica(BaseModel):
     optimo: bool = Field(
         ..., description="True si la técnica garantiza el óptimo (no el genético)."
     )
+    truncado: bool = Field(
+        False,
+        description="True si la búsqueda se detuvo por el límite de nodos (lote grande).",
+    )
 
 
 class ComparacionTecnicasResponse(BaseModel):

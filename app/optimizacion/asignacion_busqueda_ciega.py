@@ -24,6 +24,7 @@ quedan con la solución completa de MENOR costo encontrada (búsqueda exhaustiva
 
 from __future__ import annotations
 
+import logging
 import time
 from collections import deque
 from dataclasses import dataclass, field
@@ -37,6 +38,15 @@ from app.optimizacion.asignacion_astar import (
     _costo_asignacion,
 )
 
+logger = logging.getLogger(__name__)
+
+# Tope de nodos para BFS/DFS. Al ser búsquedas ciegas exhaustivas, el espacio de
+# estados crece exponencialmente con el nº de solicitudes; sin este límite la
+# comparación podría colgarse con lotes grandes. Si se alcanza, la búsqueda se
+# detiene y devuelve la mejor solución encontrada hasta ese momento (marcada
+# como truncada en los logs).
+LIMITE_NODOS = 200_000
+
 
 @dataclass
 class ResultadoBusquedaCiega:
@@ -48,6 +58,7 @@ class ResultadoBusquedaCiega:
     nodos_explorados: int
     tiempo_ejecucion_ms: float
     profundidad: int = 0
+    truncado: bool = False  # True si se alcanzó LIMITE_NODOS antes de terminar
     sin_solucion: list[int] = field(default_factory=list)
 
 
@@ -98,8 +109,20 @@ def ejecutar_busqueda_ciega(
     profundidad_max = 0
     mejor_costo = float("inf")
     mejor_asignaciones_parciales: tuple = ()
+    truncado = False
 
     while frontera:
+        # Límite de seguridad: evita que la búsqueda ciega se cuelgue con lotes
+        # grandes. Se detiene y devuelve la mejor solución hallada hasta ahora.
+        if nodos_explorados >= LIMITE_NODOS:
+            truncado = True
+            logger.warning(
+                "%s alcanzó el límite de %d nodos; búsqueda truncada.",
+                estrategia,
+                LIMITE_NODOS,
+            )
+            break
+
         # BFS saca por el frente (FIFO); DFS por el final (LIFO).
         if estrategia == "BFS":
             indice, capacidades, g, parciales = frontera.popleft()
@@ -144,7 +167,8 @@ def ejecutar_busqueda_ciega(
     tiempo_ms = (time.perf_counter() - inicio) * 1000
 
     if mejor_costo == float("inf"):
-        # No se logró asignar el lote completo (sin capacidad suficiente).
+        # No se logró asignar el lote completo (sin capacidad suficiente o
+        # búsqueda truncada antes de hallar una solución completa).
         return ResultadoBusquedaCiega(
             estrategia=estrategia,
             asignaciones=[],
@@ -152,6 +176,7 @@ def ejecutar_busqueda_ciega(
             nodos_explorados=nodos_explorados,
             tiempo_ejecucion_ms=tiempo_ms,
             profundidad=profundidad_max,
+            truncado=truncado,
             sin_solucion=[s.id for s in solicitudes],
         )
 
@@ -171,5 +196,6 @@ def ejecutar_busqueda_ciega(
         nodos_explorados=nodos_explorados,
         tiempo_ejecucion_ms=tiempo_ms,
         profundidad=profundidad_max,
+        truncado=truncado,
         sin_solucion=sin_candidatos,
     )
