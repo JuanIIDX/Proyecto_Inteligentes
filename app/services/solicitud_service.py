@@ -21,6 +21,8 @@ from app.optimizacion.asignacion_astar import (
     SolicitudPendiente,
     ejecutar_astar,
 )
+from app.optimizacion.asignacion_busqueda_ciega import ejecutar_busqueda_ciega
+from app.optimizacion.asignacion_genetico import ejecutar_genetico
 from app.repositories.solicitud_repository import SupabaseRepository
 from app.schemas.solicitud import SolicitudRequest, SolicitudUpdate
 
@@ -109,24 +111,27 @@ class SolicitudService:
     # ------------------------------------------------------------------ #
     #  Caso de uso: optimizar asignaciones pendientes con A*
     # ------------------------------------------------------------------ #
-    def optimizar_asignaciones(self) -> ResultadoAStar:
+    def _cargar_problema(
+        self,
+    ) -> tuple[list[SolicitudPendiente], list[FuncionarioCandidato]]:
         """
-        Asigna de forma óptima TODAS las solicitudes pendientes a los
-        funcionarios disponibles usando búsqueda A* (ver
-        app/optimizacion/asignacion_astar.py), persiste las asignaciones
-        resultantes y marca esas solicitudes como 'asignada'.
+        Carga desde la BD el lote de solicitudes pendientes y los funcionarios,
+        y los convierte a los tipos que usan los algoritmos de optimización.
+
+        Es la entrada común a todas las técnicas (A*, BFS/DFS, genético), para
+        que todas resuelvan exactamente el mismo problema.
         """
         pendientes = self.repo.obtener_solicitudes_pendientes()
         funcionarios = self.repo.obtener_funcionarios()
 
-        solicitudes_astar = [
+        solicitudes = [
             SolicitudPendiente(
                 id=s["id"], categoria=s["categoria"], prioridad=s["prioridad"]
             )
             for s in pendientes
             if s.get("categoria") and s.get("prioridad")
         ]
-        funcionarios_astar = [
+        candidatos = [
             FuncionarioCandidato(
                 id=f["id"],
                 nombre=f["nombre"],
@@ -137,6 +142,16 @@ class SolicitudService:
             )
             for f in funcionarios
         ]
+        return solicitudes, candidatos
+
+    def optimizar_asignaciones(self) -> ResultadoAStar:
+        """
+        Asigna de forma óptima TODAS las solicitudes pendientes a los
+        funcionarios disponibles usando búsqueda A* (ver
+        app/optimizacion/asignacion_astar.py), persiste las asignaciones
+        resultantes y marca esas solicitudes como 'asignada'.
+        """
+        solicitudes_astar, funcionarios_astar = self._cargar_problema()
 
         resultado = ejecutar_astar(solicitudes_astar, funcionarios_astar)
 
@@ -169,3 +184,78 @@ class SolicitudService:
             resultado.sin_solucion,
         )
         return resultado
+
+    # ------------------------------------------------------------------ #
+    #  Caso de uso: comparar técnicas (A* vs BFS/DFS vs Genético)
+    # ------------------------------------------------------------------ #
+    def comparar_tecnicas(self) -> dict[str, Any]:
+        """
+        Resuelve el MISMO lote de solicitudes pendientes con las cuatro técnicas
+        (A*, BFS, DFS y Algoritmo Genético) y devuelve sus métricas lado a lado.
+
+        Es un caso de uso de EVALUACIÓN: no persiste asignaciones ni cambia
+        estados, solo ejecuta y mide. La salida está pensada para graficar la
+        comparación en el frontend (costo, nodos/generaciones, tiempo) y la
+        curva de convergencia del genético.
+        """
+        solicitudes, funcionarios = self._cargar_problema()
+
+        a = ejecutar_astar(solicitudes, funcionarios)
+        bfs = ejecutar_busqueda_ciega(solicitudes, funcionarios, "BFS")
+        dfs = ejecutar_busqueda_ciega(solicitudes, funcionarios, "DFS")
+        gen = ejecutar_genetico(solicitudes, funcionarios)
+
+        # Métricas homogéneas por técnica para graficar barras comparativas.
+        # 'esfuerzo' = nodos explorados (búsquedas) o generaciones (genético).
+        tecnicas = [
+            {
+                "nombre": "A*",
+                "tipo": "Búsqueda Informada",
+                "costo_total": round(a.costo_total, 4),
+                "esfuerzo": a.nodos_explorados,
+                "esfuerzo_etiqueta": "nodos explorados",
+                "tiempo_ejecucion_ms": round(a.tiempo_ejecucion_ms, 4),
+                "optimo": True,
+            },
+            {
+                "nombre": "BFS",
+                "tipo": "Búsqueda No Informada",
+                "costo_total": round(bfs.costo_total, 4),
+                "esfuerzo": bfs.nodos_explorados,
+                "esfuerzo_etiqueta": "nodos explorados",
+                "tiempo_ejecucion_ms": round(bfs.tiempo_ejecucion_ms, 4),
+                "optimo": True,
+            },
+            {
+                "nombre": "DFS",
+                "tipo": "Búsqueda No Informada",
+                "costo_total": round(dfs.costo_total, 4),
+                "esfuerzo": dfs.nodos_explorados,
+                "esfuerzo_etiqueta": "nodos explorados",
+                "tiempo_ejecucion_ms": round(dfs.tiempo_ejecucion_ms, 4),
+                "optimo": True,
+            },
+            {
+                "nombre": "Algoritmo Genético",
+                "tipo": "Metaheurística",
+                "costo_total": round(gen.costo_total, 4),
+                "esfuerzo": gen.generaciones,
+                "esfuerzo_etiqueta": "generaciones",
+                "tiempo_ejecucion_ms": round(gen.tiempo_ejecucion_ms, 4),
+                "optimo": False,
+            },
+        ]
+
+        logger.info(
+            "Comparación de técnicas sobre %d solicitudes: %s",
+            len(solicitudes),
+            {t["nombre"]: t["costo_total"] for t in tecnicas},
+        )
+
+        return {
+            "num_solicitudes": len(solicitudes),
+            "tecnicas": tecnicas,
+            # Datos para gráficas específicas:
+            "arbol_astar": a.arbol,  # grafo del árbol de búsqueda A*
+            "convergencia_genetico": gen.historial_costos,  # curva por generación
+        }

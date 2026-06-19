@@ -11,6 +11,7 @@ import logging
 from fastapi import APIRouter, HTTPException, status
 
 from app.schemas.solicitud import (
+    ComparacionTecnicasResponse,
     FuncionarioResponse,
     OptimizacionResponse,
     SolicitudRequest,
@@ -121,6 +122,30 @@ def optimizar_asignaciones() -> OptimizacionResponse:
             detail=f"No se pudo optimizar las asignaciones: {exc}",
         ) from exc
     return OptimizacionResponse.model_validate(resultado, from_attributes=True)
+
+
+@router.post(
+    "/comparar-tecnicas",
+    response_model=ComparacionTecnicasResponse,
+    summary="Comparar A* vs BFS/DFS vs Algoritmo Genético sobre el lote pendiente",
+)
+def comparar_tecnicas() -> ComparacionTecnicasResponse:
+    """
+    Resuelve el mismo lote de solicitudes pendientes con las cuatro técnicas
+    (A*, BFS, DFS y genético) y devuelve sus métricas para comparar y graficar.
+
+    Es solo evaluación: NO persiste asignaciones ni cambia estados.
+    """
+    service = SolicitudService()
+    try:
+        resultado = service.comparar_tecnicas()
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Error comparando técnicas")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"No se pudo comparar las técnicas: {exc}",
+        ) from exc
+    return ComparacionTecnicasResponse.model_validate(resultado, from_attributes=True)
 
 
 # ---------------------------------------------------------------------- #

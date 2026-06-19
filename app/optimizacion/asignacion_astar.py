@@ -97,6 +97,18 @@ class AsignacionResultado:
 
 
 @dataclass
+class NodoArbol:
+    """Un nodo del árbol de búsqueda que A* expandió (para graficar)."""
+
+    id: int
+    padre: int | None
+    indice: int  # cuántas solicitudes ya asignadas en este nodo (profundidad)
+    g: float  # costo acumulado
+    h: float  # heurística
+    f: float  # g + h
+
+
+@dataclass
 class ResultadoAStar:
     """Resultado completo de ejecutar A* sobre un lote de solicitudes."""
 
@@ -104,6 +116,8 @@ class ResultadoAStar:
     costo_total: float
     nodos_explorados: int
     tiempo_ejecucion_ms: float
+    profundidad: int = 0  # nº de niveles del árbol = nº de solicitudes asignadas
+    arbol: list[NodoArbol] = field(default_factory=list)
     sin_solucion: list[int] = field(default_factory=list)
 
 
@@ -190,6 +204,8 @@ def ejecutar_astar(
             costo_total=0.0,
             nodos_explorados=0,
             tiempo_ejecucion_ms=(time.perf_counter() - inicio) * 1000,
+            profundidad=0,
+            arbol=[],
         )
 
     candidatos = _candidatos_por_solicitud(solicitudes, funcionarios)
@@ -212,23 +228,48 @@ def ejecutar_astar(
 
     contador = itertools.count()
     nodos_explorados = 0
+    profundidad_max = 0
+    arbol: list[NodoArbol] = []
     mejor_costo_visto: dict[tuple[int, tuple[int, ...]], float] = {}
 
+    # Cada entrada del heap lleva ahora el id de su nodo y el id de su padre,
+    # para poder reconstruir el árbol de búsqueda (nodos + aristas) al graficar.
     h_inicial = _heuristica(0, solicitudes, candidatos, costos_por_par)
-    heap: list[tuple[float, float, int, int, tuple[int, ...], tuple]] = [
-        (h_inicial, 0.0, next(contador), 0, capacidad_inicial, ())
+    id_raiz = next(contador)
+    heap: list[tuple[float, float, int, int, int | None, int, tuple[int, ...], tuple]] = [
+        (h_inicial, 0.0, id_raiz, id_raiz, None, 0, capacidad_inicial, ())
     ]
 
     while heap:
-        _f, g, _orden, indice, capacidades, asignaciones_parciales = heapq.heappop(
-            heap
-        )
+        (
+            f_actual,
+            g,
+            _orden,
+            id_nodo,
+            id_padre,
+            indice,
+            capacidades,
+            asignaciones_parciales,
+        ) = heapq.heappop(heap)
         nodos_explorados += 1
 
         clave_estado = (indice, capacidades)
         if mejor_costo_visto.get(clave_estado, float("inf")) <= g:
             continue
         mejor_costo_visto[clave_estado] = g
+
+        # Registrar este nodo expandido en el árbol de búsqueda.
+        arbol.append(
+            NodoArbol(
+                id=id_nodo,
+                padre=id_padre,
+                indice=indice,
+                g=round(g, 4),
+                h=round(f_actual - g, 4),
+                f=round(f_actual, 4),
+            )
+        )
+        profundidad_max = max(profundidad_max, indice)
 
         if indice == len(solicitudes):
             asignaciones = [
@@ -245,6 +286,8 @@ def ejecutar_astar(
                 costo_total=g,
                 nodos_explorados=nodos_explorados,
                 tiempo_ejecucion_ms=(time.perf_counter() - inicio) * 1000,
+                profundidad=profundidad_max,
+                arbol=arbol,
                 sin_solucion=sin_candidatos,
             )
 
@@ -256,12 +299,15 @@ def ejecutar_astar(
             # consumir capacidad de nadie.
             nuevo_indice = indice + 1
             nuevo_h = _heuristica(nuevo_indice, solicitudes, candidatos, costos_por_par)
+            id_hijo = next(contador)
             heapq.heappush(
                 heap,
                 (
                     g + nuevo_h,
                     g,
-                    next(contador),
+                    id_hijo,
+                    id_hijo,
+                    id_nodo,
                     nuevo_indice,
                     capacidades,
                     asignaciones_parciales,
@@ -280,13 +326,16 @@ def ejecutar_astar(
             nuevo_g = g + costo_accion
             nuevo_indice = indice + 1
             nuevo_h = _heuristica(nuevo_indice, solicitudes, candidatos, costos_por_par)
+            id_hijo = next(contador)
 
             heapq.heappush(
                 heap,
                 (
                     nuevo_g + nuevo_h,
                     nuevo_g,
-                    next(contador),
+                    id_hijo,
+                    id_hijo,
+                    id_nodo,
                     nuevo_indice,
                     nuevas_capacidades,
                     asignaciones_parciales + ((indice, j, costo_accion),),
@@ -300,5 +349,7 @@ def ejecutar_astar(
         costo_total=0.0,
         nodos_explorados=nodos_explorados,
         tiempo_ejecucion_ms=(time.perf_counter() - inicio) * 1000,
+        profundidad=profundidad_max,
+        arbol=arbol,
         sin_solucion=[s.id for s in solicitudes],
     )
