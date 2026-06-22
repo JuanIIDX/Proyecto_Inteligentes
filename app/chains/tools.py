@@ -1,18 +1,4 @@
-"""
-Tools personalizadas de LangChain.
 
-Aquí se define la Tool requerida por la rúbrica: `asignar_responsable`.
-
-Una Tool de LangChain es una función expuesta al ecosistema de agentes/cadenas
-con un nombre, una descripción y un esquema de argumentos. En este sistema la
-Tool encapsula una regla de negocio con efecto de datos real: consultar la tabla
-`funcionarios` de Supabase para decidir qué área debe atender la solicitud
-según su categoría.
-
-Se implementa con el decorador @tool y un esquema de argumentos Pydantic, de
-modo que la Tool es directamente invocable tanto desde la cadena LCEL como
-desde un futuro agente.
-"""
 
 import logging
 

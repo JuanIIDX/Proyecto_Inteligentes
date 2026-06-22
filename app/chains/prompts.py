@@ -1,17 +1,4 @@
-"""
-Plantillas de prompt (ChatPromptTemplate).
 
-Centraliza la ingeniería de prompts del sistema. El prompt de clasificación
-está diseñado con:
-  - Un mensaje de sistema que define el rol y las reglas del clasificador.
-  - Definiciones explícitas de cada categoría y de cada nivel de prioridad,
-    para reducir ambigüedad y mejorar la consistencia del LLM.
-  - Un mensaje humano con las variables {asunto}, {descripcion} y {contexto}.
-
-La variable {contexto} contiene la normativa o el histórico recuperado por el
-retriever (RAG). Cuando RAG está desactivado, la cadena la rellena con un texto
-neutro, de modo que el mismo prompt sirve con y sin recuperación.
-"""
 
 from langchain_core.prompts import ChatPromptTemplate
 

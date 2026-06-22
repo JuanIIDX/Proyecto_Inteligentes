@@ -1,24 +1,3 @@
-"""
-Cadena de clasificación construida con LCEL (LangChain Expression Language).
-
-Esta es la pieza central de IA del sistema. Orquesta tres pasos:
-
-    1) ChatPromptTemplate  -> arma el prompt con asunto y descripción.
-    2) LLM estructurado     -> Azure OpenAI devuelve un ClasificacionResult
-                               (categoría + prioridad + razonamiento).
-    3) RunnableLambda        -> invoca la Tool `asignar_responsable` para
-                               añadir el responsable según la categoría.
-
-El operador `|` de LCEL conecta los pasos como un pipeline declarativo. La
-salida final es un diccionario con la clasificación y el responsable, listo
-para persistir y devolver por la API.
-
-RAG: antes de armar el prompt, un paso previo recupera contexto (normativa
-universitaria o solicitudes históricas) desde el vector store de pgvector y lo
-inyecta en la variable {contexto}. Este paso se activa con `settings.rag_enabled`:
-si está desactivado, se rellena {contexto} con un texto neutro y el sistema se
-comporta como un clasificador puro, sin tocar la base vectorial.
-"""
 
 import logging
 from functools import lru_cache
@@ -100,14 +79,11 @@ def get_clasificacion_chain() -> Runnable:
     Construye y cachea la cadena LCEL completa.
 
     Pipeline:
-        _preparar_entrada (añade {contexto} y {fuentes} vía RAG)
-                                     -> assign(clasificacion = prompt | llm)
-                                     -> {'clasificacion': ..., 'fuentes': [...]}
+        _preparar_entrada (añade {contexto} vía RAG)
+                                     -> prompt | llm_estructurado
+                                     -> ClasificacionResult
+                                     -> {'clasificacion': ...}
                                      -> _agregar_responsable
-
-    Se usa RunnablePassthrough.assign para correr el LLM conservando las
-    {fuentes} recuperadas: así sabemos qué documentos se consultaron y podemos
-    reportarlo en la respuesta.
     """
     prompt = get_clasificacion_prompt()
 
@@ -115,10 +91,13 @@ def get_clasificacion_chain() -> Runnable:
     # ClasificacionResult, eliminando la necesidad de parsear texto a mano.
     llm_estructurado = get_llm().with_structured_output(ClasificacionResult)
 
-    # Subcadena: recupera contexto -> añade 'clasificacion' (prompt | LLM) al
-    # dict SIN perder 'fuentes', que se propagan intactas.
-    clasificador: Runnable = RunnableLambda(_preparar_entrada) | RunnablePassthrough.assign(
-        clasificacion=prompt | llm_estructurado
+    # Subcadena: recupera contexto -> prompt -> LLM. El resultado se etiqueta
+    # como 'clasificacion'.
+    clasificador: Runnable = (
+        RunnableLambda(_preparar_entrada)
+        | prompt
+        | llm_estructurado
+        | RunnableLambda(lambda r: {"clasificacion": r})
     )
 
     # Cadena final: clasifica y luego asigna el responsable vía Tool.
